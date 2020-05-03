@@ -1,21 +1,26 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
 #include <ESP8266WiFi.h>
+#include <ESPAsyncWebServer.h>
 
 #include "private.h"
 
 #define ESP8266_LED 5
 
-WiFiServer server(80);
+AsyncWebServer server(80);
 
-void initPins() {
+// HARDWARE SETUP
+
+void initHardware() {
   pinMode(ESP8266_LED, OUTPUT);
   digitalWrite(ESP8266_LED, LOW);
-}
 
-void initSerial() {
   Serial.begin(115200);
   Serial.println();
 }
+
+// WIFI CONNECTION SETUP
 
 uint8_t initWifiConnection() {
   WiFi.mode(WIFI_STA);
@@ -57,29 +62,107 @@ void notifyWifiStatus(uint8_t status) {
   Serial.println();
 }
 
-void setup() {
-  initPins();
-  initSerial();
-
+uint8_t initWifi() {
   uint8_t status = initWifiConnection();
   notifyWifiStatus(status);
-  server.begin();
+  return status;
 }
 
-void loop() {
-  // Check if a client has connected
-  WiFiClient client = server.available();
-  if (!client) {
+// WEB SERVER SETUP
+
+enum HttpStatusCode {
+  HTTP_OK = 200,
+  HTTP_BAD_REQUEST = 400,
+  HTTP_NOT_FOUND = 404
+};
+
+struct HttpError {
+  HttpStatusCode code;
+  String message;
+};
+
+int led = LOW;
+
+void sendJsonError(AsyncWebServerRequest* request, const HttpError& error) {
+  AsyncJsonResponse* response = new AsyncJsonResponse();
+  response->setCode(error.code);
+
+  const JsonObject& root = response->getRoot();
+  root["code"] = error.code;
+  root["message"] = error.message.c_str();
+
+  response->setLength();
+  request->send(response);
+}
+
+void sendJsonSettings(AsyncWebServerRequest* request) {
+  AsyncJsonResponse* response = new AsyncJsonResponse();
+
+  const JsonObject& root = response->getRoot();
+  root["led"] = led;
+
+  response->setLength();
+  request->send(response);
+}
+
+void notFound(AsyncWebServerRequest* request) {
+  HttpError error { HTTP_NOT_FOUND, "Not Found" };
+  sendJsonError(request, error);
+}
+
+void getHome(AsyncWebServerRequest* request) {
+  AsyncResponseStream* response = request->beginResponseStream("text/html");
+  response->print("<!DOCTYPE HTML><html><body><h1>It works with async!</h1></body></html>");
+  request->send(response);
+}
+
+void getSettings(AsyncWebServerRequest* request) {
+  sendJsonSettings(request);
+}
+
+void putSettings(AsyncWebServerRequest* request, JsonVariant& json) {
+  const JsonObject& root = json.as<JsonObject>();
+  if (root.isNull()) {
+    HttpError error { HTTP_BAD_REQUEST, "invalid JSON payload" };
+    sendJsonError(request, error);
     return;
   }
 
-  // Prepare the response. Start with the common header:
-  String s =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/html\r\n\r\n"
-    "<!DOCTYPE HTML>\n<html>\n"
-    "<body><h1>It works!</h1></body></html>\n";
+  int ledNew = root["led"] | -1;
+  if (ledNew == LOW || ledNew == HIGH) {
+    led = ledNew;
+    digitalWrite(ESP8266_LED, led);
+  } else {
+    HttpError error { HTTP_BAD_REQUEST, "invalid or missing LED value" };
+    sendJsonError(request, error);
+    return;
+  }
 
-  // Send the response to the client
-  client.print(s);
+  sendJsonSettings(request);
 }
+
+void initServer() {
+  server.on("/", HTTP_GET, getHome);
+
+  server.on("/settings", HTTP_GET, getSettings);
+
+  AsyncCallbackJsonWebHandler* putSettingsHandler = new AsyncCallbackJsonWebHandler("/settings", putSettings);
+  putSettingsHandler->setMethod(HTTP_PUT);
+  server.addHandler(putSettingsHandler);
+
+  server.onNotFound(notFound);
+
+  server.begin();
+}
+
+// MAIN FUNCTIONS
+
+void setup() {
+  initHardware();
+  if (initWifi() != WL_CONNECTED) {
+    return;
+  }
+  initServer();
+}
+
+void loop() {}
