@@ -70,18 +70,25 @@ uint8_t initWifi() {
 
 // WEB SERVER SETUP
 
-enum HttpStatusCode {
-  HTTP_OK = 200,
-  HTTP_BAD_REQUEST = 400,
-  HTTP_NOT_FOUND = 404
-};
+#define HTTP_OK 200
+#define HTTP_BAD_REQUEST 400
+#define HTTP_NOT_FOUND 404
 
 struct HttpError {
-  HttpStatusCode code;
-  String message;
+  int code;
+  const char* message;
 };
 
 int led = LOW;
+const char index_html[] PROGMEM =
+  "<!DOCTYPE HTML>"
+  "<html><head>"
+    "<meta charset=\"utf-8\">"
+    "<link href=\"http://192.168.0.13:8000/main.css\" rel=\"stylesheet\">"
+  "</head><body>"
+    "<h1>It works with async from PROGMEM!</h1>"
+    "<script src=\"http://192.168.0.13:8000/main.js\"></script>"
+  "</body></html>";
 
 void sendJsonError(AsyncWebServerRequest* request, const HttpError& error) {
   AsyncJsonResponse* response = new AsyncJsonResponse();
@@ -89,7 +96,7 @@ void sendJsonError(AsyncWebServerRequest* request, const HttpError& error) {
 
   const JsonObject& root = response->getRoot();
   root["code"] = error.code;
-  root["message"] = error.message.c_str();
+  root["message"] = error.message;
 
   response->setLength();
   request->send(response);
@@ -111,9 +118,7 @@ void notFound(AsyncWebServerRequest* request) {
 }
 
 void getHome(AsyncWebServerRequest* request) {
-  AsyncResponseStream* response = request->beginResponseStream("text/html");
-  response->print("<!DOCTYPE HTML><html><body><h1>It works with async!</h1></body></html>");
-  request->send(response);
+  request->send_P(200, "text/html", index_html);
 }
 
 void getSettings(AsyncWebServerRequest* request) {
