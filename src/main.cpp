@@ -16,7 +16,8 @@
 #define HTTP_NOT_FOUND 404
 
 #define TEMP_RESOLUTION 11
-#define TEMP_DELAY 750 / (1 << (12 - TEMP_RESOLUTION))
+#define TEMP_REQUEST_DELAY 750 / (1 << (12 - TEMP_RESOLUTION))
+#define TEMP_REQUEST_INTERVAL 60000
 
 AsyncWebServer server(80);
 
@@ -216,18 +217,17 @@ void setup() {
 }
 
 void loop() {
-  if (lastRequestedAt == 0ul) {
+  unsigned long now = millis();
+  if (lastRequestedAt == 0ul || (now - lastRequestedAt > TEMP_REQUEST_INTERVAL)) {
     thermometerManager.requestTemperatures();
-    lastRequestedAt = millis();
-  } else if (millis() - lastRequestedAt > TEMP_DELAY) {
+    lastRequestedAt = now;
+  } else if (now - lastRequestedAt > TEMP_REQUEST_DELAY) {
     float tempNew = thermometerManager.getTempC(thermometer);
     if (tempNew == DEVICE_DISCONNECTED_C) {
       Serial.println("Could not read temperature!");
     } else {
       temp = tempNew;
     }
-    thermometerManager.requestTemperatures();
-    lastRequestedAt = millis();
   }
   
   delay(100);
