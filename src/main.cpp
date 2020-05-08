@@ -15,9 +15,10 @@
 #define HTTP_BAD_REQUEST 400
 #define HTTP_NOT_FOUND 404
 
+#define LOOP_INTERVAL 100ul
 #define TEMP_RESOLUTION 11
-#define TEMP_REQUEST_DELAY 750 / (1 << (12 - TEMP_RESOLUTION))
-#define TEMP_REQUEST_INTERVAL 60000
+#define TEMP_REQUEST_DELAY 750ul / (1ul << (12 - TEMP_RESOLUTION))
+#define TEMP_REQUEST_INTERVAL 60000ul
 
 AsyncWebServer server(80);
 
@@ -216,12 +217,26 @@ void setup() {
   initServer();
 }
 
-void loop() {
-  unsigned long now = millis();
-  if (lastRequestedAt == 0ul || (now - lastRequestedAt > TEMP_REQUEST_INTERVAL)) {
+void updateTemperature(unsigned long startOfLoop) {
+  if (startOfLoop < lastRequestedAt) {
+    /*
+     * Underflow condition: `millis()` wraps around to zero every 50 days or so.  To
+     * make sure the board can continue to function, we manually set `lastRequestedAt`
+     * to `now`; this will cause the next request interval to happen later than usual.
+     */
+    lastRequestedAt = startOfLoop;
+  } else if (lastRequestedAt == 0ul || (startOfLoop - lastRequestedAt > TEMP_REQUEST_INTERVAL)) {
+    /*
+     * We've either never requested a temperature (`lastRequestedAt == 0ul`), or the
+     * request interval has elapsed.  Either way, request a new temperature reading.
+     */
     thermometerManager.requestTemperatures();
-    lastRequestedAt = now;
-  } else if (now - lastRequestedAt > TEMP_REQUEST_DELAY) {
+    lastRequestedAt = startOfLoop;
+  } else if (startOfLoop - lastRequestedAt > TEMP_REQUEST_DELAY) {
+    /*
+     * To read the DS18B20, you have to wait at least `TEMP_REQUEST_DELAY` ms after
+     * the previous temperature reading request.
+     */
     float tempNew = thermometerManager.getTempC(thermometer);
     if (tempNew == DEVICE_DISCONNECTED_C) {
       Serial.println("Could not read temperature!");
@@ -229,6 +244,26 @@ void loop() {
       temp = tempNew;
     }
   }
-  
-  delay(100);
+}
+
+unsigned long getLoopDelay(unsigned long startOfLoop, unsigned long endOfLoop) {
+  if (endOfLoop < startOfLoop) {
+    // Underflow condition: wait for whole interval
+    return LOOP_INTERVAL;
+  }
+  unsigned long elapsed = endOfLoop - startOfLoop;
+  if (elapsed > LOOP_INTERVAL) {
+    return 0;
+  }
+  return LOOP_INTERVAL - elapsed;
+}
+
+void loop() {
+  unsigned long startOfLoop = millis();
+
+  updateTemperature(startOfLoop);
+
+  unsigned long endOfLoop = millis();
+  unsigned long loopDelay = getLoopDelay(startOfLoop, endOfLoop);
+  delay(loopDelay);
 }
