@@ -6,6 +6,7 @@
 #include <ESPAsyncWebServer.h>
 #include <NTPClient.h>
 #include <OneWire.h>
+#include <TimeLib.h>
 #include <Timezone.h>
 #include <WiFiUdp.h>
 
@@ -23,6 +24,8 @@
 #define TEMP_RESOLUTION 11
 #define TEMP_REQUEST_DELAY 750ul / (1ul << (12 - TEMP_RESOLUTION))
 #define TEMP_REQUEST_INTERVAL 60000ul
+
+#define DATE_TIME_ISO_LEN 26
 
 /**
  * Web server, used both to load the thermostat web UI and as a REST API to change settings.
@@ -67,7 +70,12 @@ NTPClient ntpClient(ntpUDP, "pool.ntp.org");
  */
 const TimeChangeRule EDT = {"EDT", Second, Sun, Mar, 2, -240};
 const TimeChangeRule EST = {"EST", First, Sun, Nov, 2, -300};
-const Timezone TIMEZONE(EDT, EST);
+Timezone TIMEZONE(EDT, EST);
+
+/**
+ * Used to store date and time in the ISO 8601-compliant format `"2020-05-09T10:58:27-04:00"`.
+ */
+char dateTimeIso[DATE_TIME_ISO_LEN];
 
 /**
  * Controls the wifi indicator light as follows:
@@ -86,7 +94,9 @@ uint8_t heater = LOW;
 /**
  * What was the temperature last time it was measured?
  * 
- * This is measured in degrees Celsius.  As per the DS18B20 datasheet, we 
+ * This is measured in degrees Celsius.  As per the DS18B20 datasheet, we must wait
+ * `TEMP_REQUEST_DELAY` ms after the last temperature request to read thhe updated
+ * measurement.
  */
 float temp = DEVICE_DISCONNECTED_C;
 
@@ -99,20 +109,29 @@ float temp = DEVICE_DISCONNECTED_C;
 unsigned long lastRequestedAt = 0ul;
 
 /**
- *
+ * HTTP error message, containing a status code and a human-readable message.
+ * 
+ * We use this to help send HTTP error responses with JSON payloads, which helps
+ * us handle error conditions in the frontend.
  */
 struct HttpError {
   uint16_t code;
   const char* message;
 };
 
+/**
+ * HTML entry point to web UI, returned by `GET /` handler below.
+ * 
+ * It links to externally hosted `thermite` CSS / JS resources, which inject the `thermite` web
+ * application into the `#app` div.
+ */
 const char index_html[] PROGMEM =
   "<!DOCTYPE HTML>"
   "<html><head>"
     "<meta charset=\"utf-8\">"
     "<link href=\"http://192.168.0.13:8000/main.css\" rel=\"stylesheet\">"
   "</head><body>"
-    "<h1>It works with async from PROGMEM!</h1>"
+    "<div id=\"app\">"
     "<script src=\"http://192.168.0.13:8000/main.js\"></script>"
   "</body></html>";
 
@@ -187,12 +206,12 @@ uint8_t initWifiConnection() {
 
 void notifyWifiStatus(uint8_t status) {
   if (status == WL_NO_SSID_AVAIL) {
-    Serial.print("Invalid SSID!");
+    Serial.print("Invalid wifi SSID!");
   } else if (status == WL_CONNECTED) {
-    Serial.print("Connected, IP address: ");
+    Serial.print("Connected to wifi, IP address: ");
     Serial.println(WiFi.localIP());
   } else if (status == WL_CONNECT_FAILED) {
-    Serial.println("Invalid password!");
+    Serial.println("Invalid wifi password!");
   }
 
   wifiIndicator = status == WL_CONNECTED ? LOW : HIGH;
@@ -221,10 +240,34 @@ void sendJsonError(AsyncWebServerRequest* request, const HttpError& error) {
   request->send(response);
 }
 
+void updateDateTimeIso() {
+  time_t tUtc = ntpClient.getEpochTime();
+  TimeChangeRule *tcr;
+  time_t tLocal = TIMEZONE.toLocal(tUtc, &tcr);
+
+  snprintf(
+    dateTimeIso,
+    DATE_TIME_ISO_LEN,
+    "%04d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
+    year(tLocal),
+    month(tLocal),
+    day(tLocal),
+    hour(tLocal),
+    minute(tLocal),
+    second(tLocal),
+    tcr->offset >= 0 ? '+' : '-',
+    abs(tcr->offset) / 60,
+    abs(tcr->offset) % 60
+  );
+}
+
 void sendJsonSettings(AsyncWebServerRequest* request) {
+  updateDateTimeIso();
+
   AsyncJsonResponse* response = new AsyncJsonResponse();
 
   const JsonObject& root = response->getRoot();
+  root["dateTime"] = dateTimeIso;
   root["heater"] = heater;
   root["temp"] = temp;
 
@@ -267,6 +310,10 @@ void putSettings(AsyncWebServerRequest* request, JsonVariant& json) {
   sendJsonSettings(request);
 }
 
+void initNtp() {
+  ntpClient.begin();
+}
+
 void initServer() {
   server.on("/", HTTP_GET, getHome);
 
@@ -290,6 +337,7 @@ void setup() {
   if (initWifi() != WL_CONNECTED) {
     return;
   }
+  initNtp();
   initServer();
 }
 
@@ -337,6 +385,7 @@ unsigned long getLoopDelay(unsigned long startOfLoop, unsigned long endOfLoop) {
 void loop() {
   unsigned long startOfLoop = millis();
 
+  ntpClient.update();
   updateTemperature(startOfLoop);
 
   unsigned long endOfLoop = millis();
