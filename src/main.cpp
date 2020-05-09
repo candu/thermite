@@ -109,6 +109,184 @@ float temp = DEVICE_DISCONNECTED_C;
 unsigned long lastRequestedAt = 0ul;
 
 /**
+ * Hysteresis threshold for temperature targets.
+ * 
+ * When the heater is off and the temperature is below `tempTarget - tempHysteresis`, the heater
+ * is turned on.  When the heater is on and the temperature is above `tempTarget + tempHysteresis`,
+ * the heater is turned off.
+ */
+float tempHysteresis = 1.0f;
+
+/**
+ * `thermite` supports four user-configurable temperature set points.
+ */
+struct ThermiteSetPoint {
+  /**
+   * Each set point can be given a name of up to 15 characters in length.
+   */
+  char name[16];
+
+  /**
+   * Each set point has a target temperature.
+   */
+  float tempTarget;
+};
+ThermiteSetPoint setPoints[4] = {
+  { "Home Office", 20.0f },
+  { "Normal", 17.0f },
+  { "Sleep", 16.0f },
+  { "Vacation", 14.0f },
+};
+
+/**
+ * `thermite` supports four user-configurable daily schedules.
+ */
+struct ThermiteDailySchedule {
+  /**
+   * Each daily schedule can be given a name of up to 15 characters in length.
+   */
+  char name[16];
+
+  /**
+   * Each daily schedule is divided into 96 15-minute intervals.  The user can assign one
+   * of the four configured set points to each of these intervals.
+   * 
+   * These 15-minute intervals are encoded in 2 bits each, for a total of 24 bytes.
+   */
+  uint8_t schedule[24];
+
+  float getTargetTemperature(time_t t) {
+    int h = hour(t);
+    int m = minute(t);
+    int i = (this->schedule[h] >> ((m / 15) * 2)) & 0x3;
+    return setPoints[i].tempTarget;
+  }
+};
+ThermiteDailySchedule dailySchedules[4] = {
+  {
+    "Work from Home",
+    {
+      /*
+       * 0000-0700: 2 (sleep)
+       * 0700-0800: 1 (normal)
+       * 0800-1700: 0 (home office)
+       * 1700-2100: 1 (normal)
+       * 2100-0000: 2 (sleep)
+       */
+      0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
+      0xaa, 0x55, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x55,
+      0x55, 0x55, 0x55, 0xaa, 0xaa, 0xaa
+    }
+  },
+  {
+    "At the Office",
+    {
+      /*
+       * 0000-0700: 2 (sleep)
+       * 0700-2100: 1 (normal)
+       * 2100-0000: 2 (sleep)
+       */
+      0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
+      0xaa, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0xaa, 0xaa, 0xaa
+    }
+  },
+  {
+    "Day Off",
+    {
+      /*
+       * 0000-0800: 2 (sleep)
+       * 0800-2200: 1 (normal)
+       * 2200-0000: 2 (sleep)
+       */
+      0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
+      0xaa, 0xaa, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0xaa, 0xaa
+    }
+  },
+  {
+    "Other",
+    {
+      /*
+       * 0000-0800: 2 (sleep)
+       * 0800-2200: 1 (normal)
+       * 2200-0000: 2 (sleep)
+       */
+      0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
+      0xaa, 0xaa, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+      0x55, 0x55, 0x55, 0x55, 0xaa, 0xaa
+    }
+  },
+};
+
+/**
+ * `thermite` supports two weekly schedules: one main schedule and one temporary schedule.
+ */
+struct ThermiteWeeklySchedule {
+  /**
+   * The weekly schedule consists of 7 days.  The user can assign one of the four configured
+   * daily schedules to each of these days.
+   * 
+   * Daily schedules are encoded in 2 bits each, for a total of 14 bits.
+   */
+  uint16_t schedule;
+
+  float getTargetTemperature(time_t t) {
+    int d = weekday(t) - 1;
+    int i = (this->schedule >> (d * 2)) & 0x3;
+    return dailySchedules[i].getTargetTemperature(t);
+  }
+};
+ThermiteWeeklySchedule weeklySchedules[2] = {
+  {
+    /*
+     * Sun: (2) day off
+     * Mon-Fri: (0) work from home
+     * Sat: (2) day off
+     */
+    0x2002
+  },
+  {
+    /*
+     * Sun: (2) day off
+     * Mon-Fri: (0) work from home
+     * Sat: (2) day off
+     */
+    0x2002
+  },
+};
+
+/* 
+ * The temporary schedule can be set to start and end at specific times (e.g. for the
+ * remainder of this week, during all of next week, etc.)
+ */
+struct ThermiteScheduleManager {
+  time_t tempStart;
+  time_t tempEnd;
+
+  float getTargetTemperature(time_t t) {
+    if (this->tempStart <= t && t < this->tempEnd) {
+      return weeklySchedules[1].getTargetTemperature(t);
+    }
+    return weeklySchedules[0].getTargetTemperature(t);
+  }
+};
+ThermiteScheduleManager scheduleManager = { 0l, 0l };
+
+/**
+ * Is `thermite` in vacation mode?
+ * 
+ * In vacation mode, the weekly schedule is ignored, as is any with the vacation set point target
+ * temperature used throughout the day instead.
+ */
+bool vacation;
+int vacationSetPointIndex = 3;
+
+/**
  * HTTP error message, containing a status code and a human-readable message.
  * 
  * We use this to help send HTTP error responses with JSON payloads, which helps
