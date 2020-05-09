@@ -4,12 +4,16 @@
 #include <DallasTemperature.h>
 #include <ESP8266WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <NTPClient.h>
 #include <OneWire.h>
+#include <Timezone.h>
+#include <WiFiUdp.h>
 
 #include "private.h"
 
 #define PIN_ONE_WIRE 0
-#define PIN_LED 5
+#define PIN_WIFI_INDICATOR 4
+#define PIN_HEATER 5
 
 #define HTTP_OK 200
 #define HTTP_BAD_REQUEST 400
@@ -20,17 +24,83 @@
 #define TEMP_REQUEST_DELAY 750ul / (1ul << (12 - TEMP_RESOLUTION))
 #define TEMP_REQUEST_INTERVAL 60000ul
 
+/**
+ * Web server, used both to load the thermostat web UI and as a REST API to change settings.
+ * 
+ * The web UI itself is a minimal on-board page (see `index_html` below) that functions as an
+ * entry point.  It references `thermite` CSS / JS resources stored on a third-party server;
+ * these resources then render the actual interface.
+ * 
+ * The interface itself is designed to use the on-board REST API; no user information is ever
+ * sent to the third-party static resources server.
+ */
 AsyncWebServer server(80);
 
+/**
+ * OneWire bus for the DS18B20 thermometer.  We only have a single thermometer on the bus,
+ * but we could attach more - for instance, some heating / cooling systems take outdoor
+ * temperature into account to help save energy.
+ * 
+ * `thermometerManager` wraps the OneWire bus `oneWire` to provide functionality specific
+ * to DS18B20 thermometers - many other types of devices use the OneWire protocol.
+ * 
+ * `thermometer` is the device address of our single thermometer, and is used with
+ * `thermometerManager` to read the current temperature.
+ */
 OneWire oneWire(PIN_ONE_WIRE);
 DallasTemperature thermometerManager(&oneWire);
-
 DeviceAddress thermometer;
 
-uint8_t led = LOW;
+/**
+ * NTP client, used so that we can schedule temperature changes according to real-world
+ * time.
+ * 
+ * Since the ESP8266 provides us with a wifi connection, we can use NTP instead of installing
+ * a separate real-time clock (RTC) module.
+ */
+WiFiUDP ntpUDP;
+NTPClient ntpClient(ntpUDP, "pool.ntp.org");
+
+/**
+ * Hardcoded timezone information, currently set to Eastern Time with DST transitions.
+ * Change this if you're installing `thermite` in a different time zone.
+ */
+const TimeChangeRule EDT = {"EDT", Second, Sun, Mar, 2, -240};
+const TimeChangeRule EST = {"EST", First, Sun, Nov, 2, -300};
+const Timezone TIMEZONE(EDT, EST);
+
+/**
+ * Controls the wifi indicator light as follows:
+ * 
+ * - intermittent flashing: connecting to wifi;
+ * - off: wifi connected;
+ * - on: wifi connection error.
+ */
+uint8_t wifiIndicator = LOW;
+
+/**
+ * Controls the heater via the Quiic relay.
+ */
+uint8_t heater = LOW;
+
+/**
+ * What was the temperature last time it was measured?
+ * 
+ * This is measured in degrees Celsius.  As per the DS18B20 datasheet, we 
+ */
 float temp = DEVICE_DISCONNECTED_C;
+
+/**
+ * When was the temperature last requested?
+ * 
+ * To keep these regularly scheduled regardless of NTP reachability, clock drift, etc. we use
+ * `millis()` to record this from the internal clock.
+ */
 unsigned long lastRequestedAt = 0ul;
 
+/**
+ *
+ */
 struct HttpError {
   uint16_t code;
   const char* message;
@@ -75,8 +145,11 @@ bool initThermometer() {
 }
 
 bool initHardware() {
-  pinMode(PIN_LED, OUTPUT);
-  digitalWrite(PIN_LED, LOW);
+  pinMode(PIN_WIFI_INDICATOR, OUTPUT);
+  pinMode(PIN_HEATER, OUTPUT);
+
+  digitalWrite(PIN_WIFI_INDICATOR, LOW);
+  digitalWrite(PIN_HEATER, LOW);
 
   Serial.begin(115200);
   Serial.println();
@@ -102,8 +175,8 @@ uint8_t initWifiConnection() {
     }
 
     // blink LED, print to serial
-    led = i % 2 == 0 ? HIGH : LOW;
-    digitalWrite(PIN_LED, led);
+    wifiIndicator = i % 2 == 0 ? HIGH : LOW;
+    digitalWrite(PIN_WIFI_INDICATOR, wifiIndicator);
     delay(100);
     if (i % 5 == 0) {
       Serial.print(".");
@@ -122,7 +195,9 @@ void notifyWifiStatus(uint8_t status) {
     Serial.println("Invalid password!");
   }
 
-  digitalWrite(PIN_LED, LOW);
+  wifiIndicator = status == WL_CONNECTED ? LOW : HIGH;
+  digitalWrite(PIN_WIFI_INDICATOR, wifiIndicator);
+
   Serial.println();
 }
 
@@ -150,7 +225,7 @@ void sendJsonSettings(AsyncWebServerRequest* request) {
   AsyncJsonResponse* response = new AsyncJsonResponse();
 
   const JsonObject& root = response->getRoot();
-  root["led"] = led;
+  root["heater"] = heater;
   root["temp"] = temp;
 
   response->setLength();
@@ -178,12 +253,13 @@ void putSettings(AsyncWebServerRequest* request, JsonVariant& json) {
     return;
   }
 
-  uint8_t ledNew = root["led"] | -1;
-  if (ledNew == LOW || ledNew == HIGH) {
-    led = ledNew;
-    digitalWrite(PIN_LED, led);
+  // TODO: the heater should *not* be manually controllable here!
+  uint8_t heaterNew = root["heater"] | -1;
+  if (heaterNew == LOW || heaterNew == HIGH) {
+    heater = heaterNew;
+    digitalWrite(PIN_HEATER, heater);
   } else {
-    HttpError error { HTTP_BAD_REQUEST, "invalid or missing LED value" };
+    HttpError error { HTTP_BAD_REQUEST, "invalid or missing heater value" };
     sendJsonError(request, error);
     return;
   }
