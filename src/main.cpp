@@ -92,16 +92,20 @@ uint8_t wifiIndicator = LOW;
 uint8_t heater = LOW;
 
 /**
- * What was the temperature last time it was measured?
+ * Last measured temperature, in degrees Celsius.
  * 
- * This is measured in degrees Celsius.  As per the DS18B20 datasheet, we must wait
- * `TEMP_REQUEST_DELAY` ms after the last temperature request to read thhe updated
- * measurement.
+ * As per the DS18B20 datasheet, we must wait `TEMP_REQUEST_DELAY` ms after the last
+ * temperature request to read thhe updated measurement.
  */
 float temp = DEVICE_DISCONNECTED_C;
 
 /**
- * When was the temperature last requested?
+ * Target temperature, according to when this was last checked.
+ */
+float tempTarget = DEVICE_DISCONNECTED_C;
+
+/**
+ * Timestamp at which the last temperature reading was measured.
  * 
  * To keep these regularly scheduled regardless of NTP reachability, clock drift, etc. we use
  * `millis()` to record this from the internal clock.
@@ -265,17 +269,22 @@ ThermiteWeeklySchedule weeklySchedules[2] = {
  * remainder of this week, during all of next week, etc.)
  */
 struct ThermiteScheduleManager {
+  bool vacation;
+  int vacationSetPointIndex;
   time_t tempStart;
   time_t tempEnd;
 
   float getTargetTemperature(time_t t) {
+    if (this->vacation) {
+      return setPoints[this->vacationSetPointIndex].tempTarget;
+    }
     if (this->tempStart <= t && t < this->tempEnd) {
       return weeklySchedules[1].getTargetTemperature(t);
     }
     return weeklySchedules[0].getTargetTemperature(t);
   }
 };
-ThermiteScheduleManager scheduleManager = { 0l, 0l };
+ThermiteScheduleManager scheduleManager = { false, 3, 0l, 0l };
 
 /**
  * Is `thermite` in vacation mode?
@@ -283,8 +292,6 @@ ThermiteScheduleManager scheduleManager = { 0l, 0l };
  * In vacation mode, the weekly schedule is ignored, as is any with the vacation set point target
  * temperature used throughout the day instead.
  */
-bool vacation;
-int vacationSetPointIndex = 3;
 
 /**
  * HTTP error message, containing a status code and a human-readable message.
@@ -448,6 +455,7 @@ void sendJsonSettings(AsyncWebServerRequest* request) {
   root["dateTime"] = dateTimeIso;
   root["heater"] = heater;
   root["temp"] = temp;
+  root["tempTarget"] = tempTarget;
 
   response->setLength();
   request->send(response);
@@ -474,16 +482,7 @@ void putSettings(AsyncWebServerRequest* request, JsonVariant& json) {
     return;
   }
 
-  // TODO: the heater should *not* be manually controllable here!
-  uint8_t heaterNew = root["heater"] | -1;
-  if (heaterNew == LOW || heaterNew == HIGH) {
-    heater = heaterNew;
-    digitalWrite(PIN_HEATER, heater);
-  } else {
-    HttpError error { HTTP_BAD_REQUEST, "invalid or missing heater value" };
-    sendJsonError(request, error);
-    return;
-  }
+  // TODO: update settings???
 
   sendJsonSettings(request);
 }
@@ -548,6 +547,29 @@ void updateTemperature(unsigned long startOfLoop) {
   }
 }
 
+void updateTargetTemperature() {
+  time_t tUtc = ntpClient.getEpochTime();
+  time_t tLocal = TIMEZONE.toLocal(tUtc);
+  tempTarget = scheduleManager.getTargetTemperature(tLocal);
+}
+
+void updateHeater() {
+  if (tempTarget == DEVICE_DISCONNECTED_C) {
+    /*
+     * Wait until we have a valid target temperature; this should be called after
+     * `updateTargetTemperature()`.
+     */
+    return;
+  }
+  if (heater == HIGH && temp <= tempTarget - tempHysteresis) {
+    heater = LOW;
+    digitalWrite(PIN_HEATER, heater);
+  } else if (heater == LOW && temp >= tempTarget + tempHysteresis) {
+    heater = HIGH;
+    digitalWrite(PIN_HEATER, heater);
+  }
+}
+
 unsigned long getLoopDelay(unsigned long startOfLoop, unsigned long endOfLoop) {
   if (endOfLoop < startOfLoop) {
     // Underflow condition: wait for whole interval
@@ -565,6 +587,8 @@ void loop() {
 
   ntpClient.update();
   updateTemperature(startOfLoop);
+  updateTargetTemperature();
+  updateHeater();
 
   unsigned long endOfLoop = millis();
   unsigned long loopDelay = getLoopDelay(startOfLoop, endOfLoop);
