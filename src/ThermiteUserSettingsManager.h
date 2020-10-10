@@ -20,6 +20,8 @@ struct ThermiteSetPoint : public Jsonable {
   ThermiteSetPoint(const char* name, float tempTarget);
 
   bool toJSON(const JsonObject& root) const;
+  bool validateJSON(const JsonObject& root) const;
+  void updateFromJSON(const JsonObject& root);
 };
 
 struct ThermiteDailySchedule : public Jsonable {
@@ -29,15 +31,17 @@ struct ThermiteDailySchedule : public Jsonable {
   char _name[16];
 
   /**
-   * Each daily schedule is divided into 96 15-minute intervals.  The user can assign one
+   * Each daily schedule is divided into 48 30-minute intervals.  The user can assign one
    * of the four configured set points to each of these intervals.
    * 
-   * These 15-minute intervals are encoded in 2 bits each, for a total of 24 bytes.
+   * These 30-minute intervals are encoded in 2 bits each, for a total of 12 bytes.
    */
-  uint8_t _schedule[24];
+  uint8_t _schedule[12];
 
   ThermiteDailySchedule(const char* name, const uint8_t* schedule);
   bool toJSON(const JsonObject& root) const;
+  bool validateJSON(const JsonObject& root) const;
+  void updateFromJSON(const JsonObject& root);
 };
 
 struct ThermiteUserSettingsManager : public Jsonable {
@@ -52,7 +56,7 @@ struct ThermiteUserSettingsManager : public Jsonable {
   ThermiteDailySchedule _dailySchedules[4];
 
   /**
-   * `thermite` supports two weekly schedules: one main schedule and one temporary schedule.
+   * `thermite` supports one weekly schedule.
    * 
    * The weekly schedule consists of 7 days.  The user can assign one of the four configured
    * daily schedules to each of these days.
@@ -60,28 +64,28 @@ struct ThermiteUserSettingsManager : public Jsonable {
    * Daily schedules are encoded in 2 bits each, for a total of 14 bits.
    */
   uint16_t _weeklySchedule;
-  uint16_t _weeklyScheduleTemporary;
-
-  /* 
-   * The temporary schedule can be set to start and end at specific times (e.g. for the
-   * remainder of this week, during all of next week, etc.)
-   */
-  time_t _temporaryStart;
-  time_t _temporaryEnd;
 
   /**
-   * Is `thermite` in vacation mode?
-   * 
-   * In vacation mode, the weekly schedule is ignored, as is any with the vacation set point target
-   * temperature used throughout the day instead.
+   * `thermite` supports a temporary temperature override, which can be used both for
+   * short-term overrides (e.g. "set to 20 Celsius for the next hour") and longer-term
+   * "vacation mode" overrides (e.g. "I'm gone for two weeks, keep it at this
+   * temperature.")
    */
-  bool _vacation;
-  int _vacationSetPointIndex;
+  float _tempOverride;
+
+  /* 
+   * Temperature overrides are temporary: they start and end at a given time.  Both values
+   * must be set to non-zero values for the override to take effect.
+   */
+  time_t _overrideStart;
+  time_t _overrideEnd;
 
   ThermiteUserSettingsManager();
 
   float getTargetTemperature(time_t t) const;
   bool toJSON(const JsonObject& root) const;
+  bool validateJSON(const JsonObject& root) const;
+  void updateFromJSON(const JsonObject& root);
 };
 
 #endif

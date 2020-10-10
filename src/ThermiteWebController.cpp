@@ -40,10 +40,6 @@ void ThermiteWebController::_sendError(AsyncWebServerRequest* request, const Htt
   request->send(response);
 }
 
-void ThermiteWebController::getHome(AsyncWebServerRequest* request) {
-  request->send_P(200, "text/html", index_html);
-}
-
 void ThermiteWebController::getInternalState(AsyncWebServerRequest* request) {
   _internalState.updateDateTimeIso();
   _send(request, _internalState);
@@ -53,18 +49,22 @@ void ThermiteWebController::getUserSettings(AsyncWebServerRequest* request) {
   _send(request, _userSettingsManager);
 }
 
+void ThermiteWebController::putUserSettings(AsyncWebServerRequest* request, const JsonVariant& json) {
+  const JsonObject& root = json.as<JsonObject>();
+  if (!_userSettingsManager.updateFromJSONSafe(root)) {
+    HttpError error = { HTTP_BAD_REQUEST, "Invalid user settings" };
+    _sendError(request, error);
+  } else {
+    _send(request, _userSettingsManager);
+  }
+}
+
 void ThermiteWebController::notFound(AsyncWebServerRequest* request) {
   HttpError error = { HTTP_NOT_FOUND, "Not Found" };
   _sendError(request, error);
 }
 
 void ThermiteWebController::initRoutes(AsyncWebServer& server) {
-  server.on(
-    "/",
-    HTTP_GET,
-    std::bind(&ThermiteWebController::getHome, this, std::placeholders::_1)
-  );
-
   server.on(
     "/internalState",
     HTTP_GET,
@@ -76,6 +76,18 @@ void ThermiteWebController::initRoutes(AsyncWebServer& server) {
     HTTP_GET,
     std::bind(&ThermiteWebController::getUserSettings, this, std::placeholders::_1)
   );
+
+  AsyncCallbackJsonWebHandler* handlerPutUserSettings = new AsyncCallbackJsonWebHandler(
+    "/userSettings",
+    std::bind(
+      &ThermiteWebController::putUserSettings,
+      this,
+      std::placeholders::_1,
+      std::placeholders::_2
+    )
+  );
+  handlerPutUserSettings->setMethod(HTTP_PUT);
+  server.addHandler(handlerPutUserSettings);
 
   server.onNotFound(
     std::bind(&ThermiteWebController::notFound, this, std::placeholders::_1)

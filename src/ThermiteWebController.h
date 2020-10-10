@@ -13,22 +13,6 @@
 #define HTTP_NOT_FOUND 404
 
 /**
- * HTML entry point to web UI, returned by `getHome`.
- * 
- * It links to externally hosted `thermite` CSS / JS resources, which inject the `thermite` web
- * application into the `#app` div.
- */
-const char index_html[] PROGMEM =
-  "<!DOCTYPE HTML>"
-  "<html><head>"
-    "<meta charset=\"utf-8\">"
-    "<link href=\"http://192.168.0.13:8000/main.css\" rel=\"stylesheet\">"
-  "</head><body>"
-    "<div id=\"app\">"
-    "<script src=\"http://192.168.0.13:8000/main.js\"></script>"
-  "</body></html>";
-
-/**
  * HTTP error message, containing a status code and a human-readable message.
  * 
  * We use this to help send HTTP error responses with JSON payloads, which helps
@@ -41,6 +25,10 @@ struct HttpError : Jsonable {
   HttpError(uint16_t code, const char* message);
   uint16_t getCode() const;
   bool toJSON(const JsonObject& root) const;
+  bool validateJSON(const JsonObject& root) const {
+    return false;
+  }
+  void updateFromJSON(const JsonObject& root) {}
 };
 
 class ThermiteWebController {
@@ -56,9 +44,10 @@ public:
     ThermiteInternalState& internalState
   );
 
-  void getHome(AsyncWebServerRequest* request);
   void getInternalState(AsyncWebServerRequest* request);
   void getUserSettings(AsyncWebServerRequest* request);
+
+  void putUserSettings(AsyncWebServerRequest* request, const JsonVariant& json);
 
   void notFound(AsyncWebServerRequest* request);
 

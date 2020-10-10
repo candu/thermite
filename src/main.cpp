@@ -1,12 +1,9 @@
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include <AsyncJson.h>
 #include <DallasTemperature.h>
 #include <ESP8266WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <NTPClient.h>
 #include <OneWire.h>
-#include <TimeLib.h>
 #include <Timezone.h>
 #include <WiFiUdp.h>
 
