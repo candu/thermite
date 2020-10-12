@@ -4,9 +4,9 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-#include "Jsonable.h"
+#include "JsonIO.h"
 
-struct ThermiteSetPoint : public Jsonable {
+struct ThermiteSetPoint : public JsonRead, public JsonWrite {
   /**
    * Each set point can be given a name of up to 15 characters in length.
    */
@@ -24,7 +24,7 @@ struct ThermiteSetPoint : public Jsonable {
   void updateFromJSON(const JsonObject& root);
 };
 
-struct ThermiteDailySchedule : public Jsonable {
+struct ThermiteDailySchedule : public JsonRead, public JsonWrite {
   /**
    * Each daily schedule can be given a name of up to 15 characters in length.
    */
@@ -44,7 +44,7 @@ struct ThermiteDailySchedule : public Jsonable {
   void updateFromJSON(const JsonObject& root);
 };
 
-struct ThermiteUserSettingsManager : public Jsonable {
+struct ThermiteUserSettingsManager : public JsonRead, public JsonWrite {
   /**
    * `thermite` supports four user-configurable temperature set points.
    */

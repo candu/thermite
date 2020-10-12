@@ -6,7 +6,7 @@
 #include <NTPClient.h>
 #include <Timezone.h>
 
-#include "Jsonable.h"
+#include "JsonIO.h"
 #include "ThermiteUserSettingsManager.h"
 
 #define DATE_TIME_ISO_LEN 26
@@ -14,7 +14,7 @@
 #define TEMP_REQUEST_DELAY 750ul / (1ul << (12 - TEMP_RESOLUTION))
 #define TEMP_REQUEST_INTERVAL 60000ul
 
-class ThermiteInternalState : public Jsonable {
+class ThermiteInternalState : public JsonWrite {
 private:
   const ThermiteUserSettingsManager& _userSettingsManager;
   DallasTemperature& _thermometerManager;

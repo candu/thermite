@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 
-#include "Jsonable.h"
+#include "JsonIO.h"
 #include "ThermiteInternalState.h"
 #include "ThermiteUserSettingsManager.h"
 
@@ -18,17 +18,13 @@
  * We use this to help send HTTP error responses with JSON payloads, which helps
  * us handle error conditions in the frontend.
  */
-struct HttpError : Jsonable {
+struct HttpError : public JsonWrite {
   uint16_t _code;
   const char* _message;
 
   HttpError(uint16_t code, const char* message);
   uint16_t getCode() const;
   bool toJSON(const JsonObject& root) const;
-  bool validateJSON(const JsonObject& root) const {
-    return false;
-  }
-  void updateFromJSON(const JsonObject& root) {}
 };
 
 class ThermiteWebController {
@@ -36,7 +32,7 @@ private:
   ThermiteUserSettingsManager& _userSettingsManager;
   ThermiteInternalState& _internalState;
 
-  void _send(AsyncWebServerRequest* request, const Jsonable& jsonable) const;
+  void _send(AsyncWebServerRequest* request, const JsonWrite& jsonWrite) const;
   void _sendError(AsyncWebServerRequest* request, const HttpError& error) const;
 public:
   ThermiteWebController(

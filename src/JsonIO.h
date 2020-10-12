@@ -1,10 +1,9 @@
-#ifndef _JSONABLE_H__
-#define _JSONABLE_H__
+#ifndef _JSON_IO_H__
+#define _JSON_IO_H__
 
 #include <ArduinoJson.h>
 
-struct Jsonable {
-  virtual bool toJSON(const JsonObject& root) const = 0;
+struct JsonRead {
   virtual bool validateJSON(const JsonObject& root) const = 0;
   virtual void updateFromJSON(const JsonObject& root) = 0;
 
@@ -15,6 +14,10 @@ struct Jsonable {
     updateFromJSON(root);
     return true;
   }
+};
+
+struct JsonWrite {
+  virtual bool toJSON(const JsonObject& root) const = 0;
 };
 
 #endif

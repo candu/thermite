@@ -23,10 +23,10 @@ ThermiteWebController::ThermiteWebController(
 ) : _userSettingsManager(userSettingsManager),
     _internalState(internalState) {}
 
-void ThermiteWebController::_send(AsyncWebServerRequest* request, const Jsonable& jsonable) const {
+void ThermiteWebController::_send(AsyncWebServerRequest* request, const JsonWrite& jsonWrite) const {
   AsyncJsonResponse* response = new AsyncJsonResponse(false, 3072u);
   const JsonObject& root = response->getRoot();
-  jsonable.toJSON(root);
+  jsonWrite.toJSON(root);
   response->setLength();
   request->send(response);
 }
