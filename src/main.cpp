@@ -164,6 +164,8 @@ void setup() {
   }
   ntpClient.begin();
   webController.initRoutes(server);
+
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   server.begin();
 }
 

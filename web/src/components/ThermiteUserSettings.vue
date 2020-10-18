@@ -1,6 +1,13 @@
 <template>
-  <div class="thermite-user-settings">
-    TODO: user settings
+  <div
+    class="thermite-user-settings"
+    :class="{
+      'md-and-up': $vuetify.breakpoint.mdAndUp,
+    }">
+    <v-progress-circular
+      v-if="internalValue === null"
+      color="primary"
+      indeterminate />
   </div>
 </template>
 
@@ -22,3 +29,11 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+.thermite-user-settings {
+  &.md-and-up {
+    margin-left: 256px;
+  }
+}
+</style>

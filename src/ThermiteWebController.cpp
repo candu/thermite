@@ -60,8 +60,12 @@ void ThermiteWebController::putUserSettings(AsyncWebServerRequest* request, cons
 }
 
 void ThermiteWebController::notFound(AsyncWebServerRequest* request) {
-  HttpError error = { HTTP_NOT_FOUND, "Not Found" };
-  _sendError(request, error);
+  if (request->method() == HTTP_OPTIONS) {
+    request->send(204);
+  } else {
+    HttpError error = { HTTP_NOT_FOUND, "Not Found" };
+    _sendError(request, error); 
+  }
 }
 
 void ThermiteWebController::initRoutes(AsyncWebServer& server) {

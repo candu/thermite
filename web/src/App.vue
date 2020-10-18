@@ -22,9 +22,15 @@
     <v-main class="flex-grow-1 flex-shrink-1 fill">
       <ThermiteNav
         v-model="showNav"
-        class="fill-height" />
+        :class="{
+          'fill-height': $vuetify.breakpoint.mdAndUp,
+        }" />
+      <ThermiteInternalState
+        v-if="!$vuetify.breakpoint.mdAndUp"
+        :internal-state="internalState" />
       <ThermiteUserSettings
-        v-model="userSettings" />
+        v-model="userSettings"
+        class="pa-4" />
     </v-main>
   </v-app>
 </template>
@@ -33,6 +39,11 @@
 import ThermiteInternalState from './components/ThermiteInternalState.vue';
 import ThermiteNav from './components/ThermiteNav.vue';
 import ThermiteUserSettings from './components/ThermiteUserSettings.vue';
+
+async function getJson(url) {
+  const response = await fetch(url);
+  return response.json();
+}
 
 export default {
   name: 'App',
@@ -43,10 +54,28 @@ export default {
   },
   data() {
     return {
+      backendIpAddress: '192.168.0.16',
       internalState: null,
       showNav: this.$vuetify.breakpoint.mdAndUp,
       userSettings: null,
     };
+  },
+  created() {
+    this.loadAsync();
+  },
+  methods: {
+    async loadAsync() {
+      const { backendIpAddress } = this;
+      const [
+        internalState,
+        userSettings,
+      ] = await Promise.all([
+        getJson(`http://${backendIpAddress}/internalState`),
+        getJson(`http://${backendIpAddress}/userSettings`),
+      ]);
+      this.internalState = internalState;
+      this.userSettings = userSettings;
+    },
   },
 };
 </script>

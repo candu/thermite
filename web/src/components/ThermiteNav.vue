@@ -1,6 +1,7 @@
 <template>
   <v-navigation-drawer
     v-model="internalValue"
+    absolute
     :permanent="$vuetify.breakpoint.mdAndUp">
     <v-list dense nav>
       <v-list-item

@@ -1,5 +1,9 @@
 <template>
-  <div>TODO: internal state</div>
+  <div class="thermite-internal-state">
+    <v-progress-circular
+      v-if="internalState === null"
+      indeterminate />
+  </div>
 </template>
 
 <script>
