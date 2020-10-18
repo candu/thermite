@@ -11,31 +11,40 @@
         <v-spacer></v-spacer>
 
         <ThermiteInternalState
+          v-if="$vuetify.breakpoint.mdAndUp"
           :internal-state="internalState" />
+        <v-app-bar-nav-icon
+          v-else
+          @click.stop="showNav = !showNav"></v-app-bar-nav-icon>
       </div>
     </v-app-bar>
 
-    <v-main class="flex-grow-1 flex-shrink-1">
+    <v-main class="flex-grow-1 flex-shrink-1 fill">
+      <ThermiteNav
+        v-model="showNav"
+        class="fill-height" />
       <ThermiteUserSettings
-        class="fill-height"
-        :user-settings="userSettings" />
+        v-model="userSettings" />
     </v-main>
   </v-app>
 </template>
 
 <script>
 import ThermiteInternalState from './components/ThermiteInternalState.vue';
+import ThermiteNav from './components/ThermiteNav.vue';
 import ThermiteUserSettings from './components/ThermiteUserSettings.vue';
 
 export default {
   name: 'App',
   components: {
     ThermiteInternalState,
+    ThermiteNav,
     ThermiteUserSettings,
   },
   data() {
     return {
       internalState: null,
+      showNav: this.$vuetify.breakpoint.mdAndUp,
       userSettings: null,
     };
   },
