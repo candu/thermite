@@ -1,32 +1,57 @@
 <template>
-  <div id="app">
-    <div id="nav">
-      <router-link to="/">Home</router-link> |
-      <router-link to="/about">About</router-link>
-    </div>
-    <router-view/>
-  </div>
+  <v-app class="d-flex flex-column screen-height">
+    <v-app-bar
+      app
+      color="primary"
+      dark>
+      <div class="d-flex align-center full-width">
+        <v-icon left>mdi-home-thermometer</v-icon>
+        <h1>thermite</h1>
+
+        <v-spacer></v-spacer>
+
+        <ThermiteInternalState
+          :internal-state="internalState" />
+      </div>
+    </v-app-bar>
+
+    <v-main class="flex-grow-1 flex-shrink-1">
+      <ThermiteUserSettings
+        class="fill-height"
+        :user-settings="userSettings" />
+    </v-main>
+  </v-app>
 </template>
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
+<script>
+import ThermiteInternalState from './components/ThermiteInternalState.vue';
+import ThermiteUserSettings from './components/ThermiteUserSettings.vue';
+
+export default {
+  name: 'App',
+  components: {
+    ThermiteInternalState,
+    ThermiteUserSettings,
+  },
+  data() {
+    return {
+      internalState: null,
+      userSettings: null,
+    };
+  },
+};
+</script>
+
+<style lang="scss">
+.full-height {
+  height: 100%;
 }
 
-#nav {
-  padding: 30px;
+.full-width {
+  width: 100%;
 }
 
-#nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-#nav a.router-link-exact-active {
-  color: #42b983;
+.screen-height {
+  height: 100vh;
 }
 </style>
