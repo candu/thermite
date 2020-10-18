@@ -25,9 +25,13 @@
         :class="{
           'fill-height': $vuetify.breakpoint.mdAndUp,
         }" />
-      <ThermiteInternalState
+      <div
         v-if="!$vuetify.breakpoint.mdAndUp"
-        :internal-state="internalState" />
+        class="pa-4">
+        <h2>Status</h2>
+        <ThermiteInternalState
+          :internal-state="internalState" />
+      </div>
       <ThermiteUserSettings
         v-model="userSettings"
         class="pa-4" />
