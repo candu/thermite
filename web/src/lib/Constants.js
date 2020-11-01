@@ -1,3 +1,5 @@
+const NAME_MAX = 15;
+
 const SET_POINT_SYMBOLS = [
   { color: 'red', icon: 'mdi-circle' },
   { color: 'blue', icon: 'mdi-star' },
@@ -6,10 +8,12 @@ const SET_POINT_SYMBOLS = [
 ];
 
 const Constants = {
+  NAME_MAX,
   SET_POINT_SYMBOLS,
 };
 
 export {
   Constants as default,
+  NAME_MAX,
   SET_POINT_SYMBOLS,
 };

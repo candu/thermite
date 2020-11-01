@@ -6,7 +6,10 @@
       <v-col :cols="8">
         <v-text-field
           v-model="setPoint.name"
-          label="Name">
+          label="Name"
+          maxlength="15"
+          messages="Maximum of 15 characters."
+          required>
           <template v-slot:prepend>
             <v-icon
               :color="SET_POINT_SYMBOLS[i].color">
@@ -19,7 +22,11 @@
         <v-text-field
           v-model.number="setPoint.tempTarget"
           :label="'Target Temp (\u00b0C)'"
-          type="number" />
+          :max="30"
+          :min="10"
+          :step="0.25"
+          type="number"
+          required />
       </v-col>
     </v-row>
   </div>
