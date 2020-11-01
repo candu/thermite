@@ -1,41 +1,40 @@
 <template>
   <div>
-    <p>
-I'm baby sartorial green juice irony squid air plant. Jean shorts synth narwhal helvetica plaid
-poke four loko keffiyeh semiotics pug direct trade drinking vinegar gluten-free air plant.
-Freegan pabst hexagon, hot chicken fashion axe cronut schlitz twee ethical jianbing green juice
-organic godard master cleanse coloring book. Lo-fi stumptown austin cardigan poke, XOXO chia.
-</p><p>
-Authentic quinoa vinyl 90's aesthetic. Celiac bicycle rights crucifix, cliche brunch keffiyeh
-shoreditch try-hard lyft deep v DIY. Polaroid glossier tote bag shoreditch tousled farm-to-table
-tattooed. Fixie YOLO mumblecore venmo. Photo booth vaporware stumptown leggings blue bottle deep
-v asymmetrical poke. Literally tbh tote bag lumbersexual you probably haven't heard of them
-distillery chillwave. Hot chicken cliche iPhone, fashion axe taiyaki four dollar toast migas
-godard wolf cloud bread flannel mustache blue bottle copper mug kitsch.
-</p><p>
-Kickstarter sustainable try-hard, vaporware ugh quinoa unicorn blog pour-over. Activated
-charcoal poke tofu seitan. Twee photo booth kinfolk next level, pug raclette drinking vinegar
-iPhone. Drinking vinegar kitsch austin neutra.
-</p><p>
-Ethical poutine affogato, jianbing austin tumeric fanny pack gluten-free disrupt tousled
-wayfarers keytar drinking vinegar twee. Wayfarers snackwave tofu gluten-free vape shaman. Chambray
-8-bit freegan coloring book. Photo booth tousled hot chicken venmo copper mug microdosing.
-</p><p>
-Pabst freegan tote bag, coloring book cloud bread gluten-free distillery try-hard chambray
-lumbersexual helvetica truffaut subway tile neutra swag. Typewriter kale chips intelligentsia
-master cleanse, pour-over kitsch pitchfork fashion axe iPhone wolf everyday carry gluten-free
-austin migas. Marfa flannel tattooed distillery hot chicken banjo, kickstarter poke thundercats
-DIY normcore vape occupy 90's butcher. Offal cardigan bushwick literally pitchfork. You probably
-aven't heard of them next level salvia marfa cloud bread church-key affogato meh.
-        </p>
+    <v-row
+      v-for="(setPoint, i) in internalValue.setPoints"
+      :key="'setPoints_' + i">
+      <v-col :cols="8">
+        <v-text-field
+          v-model="setPoint.name"
+          label="Name">
+          <template v-slot:prepend>
+            <v-icon
+              :color="SET_POINT_SYMBOLS[i].color">
+              {{SET_POINT_SYMBOLS[i].icon}}
+            </v-icon>
+          </template>
+        </v-text-field>
+      </v-col>
+      <v-col :cols="4">
+        <v-text-field
+          v-model.number="setPoint.tempTarget"
+          :label="'Target Temp (\u00b0C)'"
+          type="number" />
+      </v-col>
+    </v-row>
   </div>
 </template>
 
 <script>
+import { SET_POINT_SYMBOLS } from '@/lib/Constants';
+
 export default {
   name: 'ThermiteSetPoints',
   props: {
     value: Object,
+  },
+  data() {
+    return { SET_POINT_SYMBOLS };
   },
   computed: {
     internalValue: {

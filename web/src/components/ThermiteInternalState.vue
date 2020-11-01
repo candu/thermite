@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="thermite-internal-state"
-    :class="{
-      'd-flex': $vuetify.breakpoint.mdAndUp,
-    }">
+  <div class="thermite-internal-state d-flex">
     <v-progress-circular
       v-if="internalState === null"
       indeterminate />
