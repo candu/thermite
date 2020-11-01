@@ -21,17 +21,15 @@
 
     <v-main class="flex-grow-1 flex-shrink-1 fill">
       <ThermiteNav
-        v-model="showNav"
-        :class="{
-          'fill-height': $vuetify.breakpoint.mdAndUp,
-        }" />
-      <div
+        v-model="showNav" />
+      <section
         v-if="!$vuetify.breakpoint.mdAndUp"
-        class="pa-4">
+        class="pa-4"
+        id="internalState">
         <h2>Status</h2>
         <ThermiteInternalState
           :internal-state="internalState" />
-      </div>
+      </section>
       <ThermiteUserSettings
         v-model="userSettings"
         class="pa-4" />
@@ -40,9 +38,9 @@
 </template>
 
 <script>
-import ThermiteInternalState from './components/ThermiteInternalState.vue';
-import ThermiteNav from './components/ThermiteNav.vue';
-import ThermiteUserSettings from './components/ThermiteUserSettings.vue';
+import ThermiteInternalState from '@/components/ThermiteInternalState.vue';
+import ThermiteNav from '@/components/ThermiteNav.vue';
+import ThermiteUserSettings from '@/components/ThermiteUserSettings.vue';
 
 async function getJson(url) {
   const response = await fetch(url);
