@@ -1,43 +1,58 @@
 <template>
   <div>
-    <p>
-I'm baby sartorial green juice irony squid air plant. Jean shorts synth narwhal helvetica plaid
-poke four loko keffiyeh semiotics pug direct trade drinking vinegar gluten-free air plant.
-Freegan pabst hexagon, hot chicken fashion axe cronut schlitz twee ethical jianbing green juice
-organic godard master cleanse coloring book. Lo-fi stumptown austin cardigan poke, XOXO chia.
-</p><p>
-Authentic quinoa vinyl 90's aesthetic. Celiac bicycle rights crucifix, cliche brunch keffiyeh
-shoreditch try-hard lyft deep v DIY. Polaroid glossier tote bag shoreditch tousled farm-to-table
-tattooed. Fixie YOLO mumblecore venmo. Photo booth vaporware stumptown leggings blue bottle deep
-v asymmetrical poke. Literally tbh tote bag lumbersexual you probably haven't heard of them
-distillery chillwave. Hot chicken cliche iPhone, fashion axe taiyaki four dollar toast migas
-godard wolf cloud bread flannel mustache blue bottle copper mug kitsch.
-</p><p>
-Kickstarter sustainable try-hard, vaporware ugh quinoa unicorn blog pour-over. Activated
-charcoal poke tofu seitan. Twee photo booth kinfolk next level, pug raclette drinking vinegar
-iPhone. Drinking vinegar kitsch austin neutra.
-</p><p>
-Ethical poutine affogato, jianbing austin tumeric fanny pack gluten-free disrupt tousled
-wayfarers keytar drinking vinegar twee. Wayfarers snackwave tofu gluten-free vape shaman. Chambray
-8-bit freegan coloring book. Photo booth tousled hot chicken venmo copper mug microdosing.
-</p><p>
-Pabst freegan tote bag, coloring book cloud bread gluten-free distillery try-hard chambray
-lumbersexual helvetica truffaut subway tile neutra swag. Typewriter kale chips intelligentsia
-master cleanse, pour-over kitsch pitchfork fashion axe iPhone wolf everyday carry gluten-free
-austin migas. Marfa flannel tattooed distillery hot chicken banjo, kickstarter poke thundercats
-DIY normcore vape occupy 90's butcher. Offal cardigan bushwick literally pitchfork. You probably
-aven't heard of them next level salvia marfa cloud bread church-key affogato meh.
-        </p>
+    <v-checkbox
+      v-model="enableTempOverride"
+      label="Enable Vacation Mode?" />
+    <template v-if="enableTempOverride">
+      <v-text-field
+          v-model.number="internalValue.tempOverride"
+          :label="'Vacation Temp (\u00b0C)'"
+          :max="30"
+          :min="10"
+          :step="0.25"
+          type="number"
+          required />
+      <ThermiteDatetimePicker
+        v-model="internalValue.overrideStart"
+        label="Vacation Mode Start" />
+      <ThermiteDatetimePicker
+        v-model="internalValue.overrideEnd"
+        label="Vacation Mode End" />
+    </template>
   </div>
 </template>
 
 <script>
+import { DateTime } from 'luxon';
+
+import ThermiteDatetimePicker from '@/components/ThermiteDatetimePicker.vue';
+
 export default {
   name: 'ThermiteTempOverride',
+  components: {
+    ThermiteDatetimePicker,
+  },
   props: {
     value: Object,
   },
   computed: {
+    enableTempOverride: {
+      get() {
+        const { overrideStart, overrideEnd } = this.internalValue;
+        return overrideStart !== 0 && overrideEnd !== 0;
+      },
+      set(enableTempOverride) {
+        if (enableTempOverride) {
+          const now = DateTime.local();
+          const nowPlusOneWeek = now.plus({ weeks: 1 });
+          this.internalValue.overrideStart = Math.floor(now.toMillis() / 1000);
+          this.internalValue.overrideEnd = Math.floor(nowPlusOneWeek.toMillis() / 1000);
+        } else {
+          this.internalValue.overrideStart = 0;
+          this.internalValue.overrideEnd = 0;
+        }
+      },
+    },
     internalValue: {
       get() {
         return this.value;
