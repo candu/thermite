@@ -10,6 +10,9 @@ module.exports = {
   parserOptions: {
     parser: 'babel-eslint',
   },
+  rules: {
+    'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
+  },
   overrides: [
     {
       files: [
