@@ -165,7 +165,10 @@ void setup() {
   ntpClient.begin();
   webController.initRoutes(server);
 
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "PUT,GET,OPTIONS");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+  DefaultHeaders::Instance().addHeader("Access-Control-Max-Age", "600");
   server.begin();
 }
 

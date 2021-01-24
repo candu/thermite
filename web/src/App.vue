@@ -10,6 +10,26 @@
 
         <v-spacer></v-spacer>
 
+        <div
+          v-if="userSettings !== null && dirty"
+          class="mr-6">
+          <v-btn
+            class="mr-2"
+            :disabled="loading"
+            :loading="loading"
+            outlined
+            @click="actionCancel">
+            Cancel
+          </v-btn>
+
+          <v-btn
+            class="mr-2 white primary--text"
+            :disabled="loading"
+            :loading="loading"
+            @click="actionSave">
+            Save
+          </v-btn>
+        </div>
         <ThermiteInternalState
           v-if="$vuetify.breakpoint.mdAndUp"
           :internal-state="internalState" />
@@ -38,12 +58,26 @@
 </template>
 
 <script>
+import Vue from 'vue';
+
 import ThermiteInternalState from '@/components/ThermiteInternalState.vue';
 import ThermiteNav from '@/components/ThermiteNav.vue';
 import ThermiteUserSettings from '@/components/ThermiteUserSettings.vue';
 
 async function getJson(url) {
   const response = await fetch(url);
+  return response.json();
+}
+
+async function putJson(url, data) {
+  const options = {
+    body: JSON.stringify(data),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'PUT',
+  };
+  const response = await fetch(url, options);
   return response.json();
 }
 
@@ -57,15 +91,52 @@ export default {
   data() {
     return {
       backendIpAddress: '192.168.0.16',
+      dirty: false,
       internalState: null,
+      loading: false,
       showNav: this.$vuetify.breakpoint.mdAndUp,
       userSettings: null,
     };
+  },
+  watch: {
+    userSettings: {
+      deep: true,
+      handler(userSettings, userSettingsOld) {
+        if (userSettingsOld === null) {
+          return;
+        }
+        this.dirty = true;
+      },
+    },
   },
   created() {
     this.loadAsync();
   },
   methods: {
+    async actionCancel() {
+      this.loading = true;
+
+      const { backendIpAddress } = this;
+      const userSettings = await getJson(`http://${backendIpAddress}/userSettings`);
+      this.userSettings = userSettings;
+
+      Vue.nextTick(() => {
+        this.dirty = false;
+        this.loading = false;
+      });
+    },
+    async actionSave() {
+      this.loading = true;
+
+      const { backendIpAddress } = this;
+      const userSettings = await putJson(`http://${backendIpAddress}/userSettings`, this.userSettings);
+      this.userSettings = userSettings;
+
+      Vue.nextTick(() => {
+        this.dirty = false;
+        this.loading = false;
+      });
+    },
     async loadAsync() {
       const { backendIpAddress } = this;
       const [

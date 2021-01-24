@@ -48,7 +48,7 @@ export default {
     nowStyle() {
       const h = this.now.getHours();
       const m = this.now.getMinutes();
-      const pct = 100 * (h / 60 + m / 1440);
+      const pct = 100 * (h / 24 + m / 1440);
       const pctFixed = pct.toFixed(2);
       const left = `calc(${pctFixed}% - 1px)`;
       return { left };
