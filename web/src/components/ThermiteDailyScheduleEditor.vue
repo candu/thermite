@@ -7,23 +7,19 @@
         messages="Maximum of 15 characters."
         required>
       </v-text-field>
-      <div
-        class="daily-schedule mt-4"
-        :class="readonly ? '' : 'editable'">
+      <div class="daily-schedule mt-4">
         <div
           v-for="(setPoint, i) in internalValue.schedule"
           :key="i"
+          :class="SET_POINT_SYMBOLS[setPoint].color + ' lighten-4 pa-2'"
           @click="changeSchedule(i)">
-          <div
-            :class="SET_POINT_SYMBOLS[setPoint].color + ' lighten-4 pa-2'">
-            <span>{{textTimes[i]}}</span>
-            <v-icon
-              class="ml-6"
-              :color="SET_POINT_SYMBOLS[setPoint].color">
-              {{SET_POINT_SYMBOLS[setPoint].icon}}
-            </v-icon>
-            <span class="ml-2">{{textSetPoints[setPoint]}}</span>
-          </div>
+          <span>{{textTimes[i]}}</span>
+          <v-icon
+            class="ml-4"
+            :color="SET_POINT_SYMBOLS[setPoint].color">
+            {{SET_POINT_SYMBOLS[setPoint].icon}}
+          </v-icon>
+          <span class="ml-2">{{textSetPoints[setPoint]}}</span>
         </div>
       </div>
   </div>
@@ -66,10 +62,6 @@ function fromInternalValue(internalValue) {
 export default {
   name: 'ThermiteDailyScheduleEditor',
   props: {
-    readonly: {
-      type: Boolean,
-      default: false,
-    },
     setPoints: Array,
     value: Object,
   },
@@ -102,10 +94,6 @@ export default {
   },
   methods: {
     changeSchedule(i) {
-      if (this.readonly) {
-        return;
-      }
-
       let setPoint = this.internalValue.schedule[i];
       setPoint = (setPoint + 1) % 4;
       Vue.set(this.internalValue.schedule, i, setPoint);
@@ -118,9 +106,11 @@ export default {
 </script>
 
 <style lang="scss">
-.daily-schedule.editable > div {
+.daily-schedule > div {
   cursor: pointer;
   opacity: 0.7;
+  transition: all 100ms ease-in-out;
+  user-select: none;
   &:hover {
     opacity: 1;
   }
