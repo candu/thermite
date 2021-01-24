@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="mb-6">
      <v-text-field
         v-model="internalValue.name"
         label="Name"
@@ -7,43 +7,22 @@
         messages="Maximum of 15 characters."
         required>
       </v-text-field>
-      <div>
+      <div
+        class="daily-schedule mt-4"
+        :class="readonly ? '' : 'editable'">
         <div
           v-for="(setPoint, i) in internalValue.schedule"
-          :key="i">
-          <div class="align-center d-flex">
-            <div class="body-2 mr-2">{{times[i]}}</div>
-            <v-select
-              v-model="internalValue.schedule[i]"
-              :class="SET_POINT_SYMBOLS[setPoint].color + ' lighten-4 pt-0'"
-              hide-details
-              :items="itemsSetPoints"
-              :readonly="readonly">
-              <template v-slot:selection="{ item }">
-                <div class="align-center d-flex">
-                  <v-icon
-                    :color="SET_POINT_SYMBOLS[item.value].color">
-                    {{SET_POINT_SYMBOLS[item.value].icon}}
-                  </v-icon>
-                  <span class="ml-2">{{item.text}}</span>
-                </div>
-              </template>
-              <template v-slot:item="{ attrs, item, on }">
-                <v-list-item v-on="on" v-bind="attrs">
-                  <v-list-item-content>
-                    <v-list-item-title>
-                      <div class="align-center d-flex">
-                        <v-icon
-                          :color="SET_POINT_SYMBOLS[item.value].color">
-                          {{SET_POINT_SYMBOLS[item.value].icon}}
-                        </v-icon>
-                        <span class="ml-2">{{item.text}}</span>
-                      </div>
-                    </v-list-item-title>
-                  </v-list-item-content>
-                </v-list-item>
-              </template>
-            </v-select>
+          :key="i"
+          @click="changeSchedule(i)">
+          <div
+            :class="SET_POINT_SYMBOLS[setPoint].color + ' lighten-4 pa-2'">
+            <span>{{textTimes[i]}}</span>
+            <v-icon
+              class="ml-6"
+              :color="SET_POINT_SYMBOLS[setPoint].color">
+              {{SET_POINT_SYMBOLS[setPoint].icon}}
+            </v-icon>
+            <span class="ml-2">{{textSetPoints[setPoint]}}</span>
           </div>
         </div>
       </div>
@@ -51,6 +30,8 @@
 </template>
 
 <script>
+import Vue from 'vue';
+
 import { SET_POINT_SYMBOLS } from '@/lib/Constants';
 
 function toInternalValue(value) {
@@ -93,7 +74,9 @@ export default {
     value: Object,
   },
   data() {
-    const times = new Array(48);
+    const internalValue = toInternalValue(this.value);
+
+    const textTimes = new Array(48);
     for (let i = 0; i < 48; i++) {
       const h = Math.floor(i / 2);
       let hh = h.toString();
@@ -101,27 +84,45 @@ export default {
         hh = `0${h}`;
       }
       const mm = i % 2 === 0 ? '00' : '30';
-      times[i] = `${hh}:${mm}`;
+      textTimes[i] = `${hh}:${mm}`;
     }
-    return { SET_POINT_SYMBOLS, times };
+
+    return {
+      internalValue,
+      SET_POINT_SYMBOLS,
+      textTimes,
+    };
   },
   computed: {
-    internalValue: {
-      get() {
-        return toInternalValue(this.value);
-      },
-      set(internalValue) {
-        const value = fromInternalValue(internalValue);
-        this.$emit('input', value);
-      },
+    textSetPoints() {
+      return this.setPoints.map(
+        ({ name, tempTarget }) => `${name}: ${tempTarget} \u00b0C`,
+      );
     },
-    itemsSetPoints() {
-      return this.setPoints.map((setPoint, i) => {
-        const { name, tempTarget } = setPoint;
-        const text = `${name}: ${tempTarget} \u00b0C`;
-        return { text, value: i };
-      });
+  },
+  methods: {
+    changeSchedule(i) {
+      if (this.readonly) {
+        return;
+      }
+
+      let setPoint = this.internalValue.schedule[i];
+      setPoint = (setPoint + 1) % 4;
+      Vue.set(this.internalValue.schedule, i, setPoint);
+
+      const value = fromInternalValue(this.internalValue);
+      this.$emit('input', value);
     },
   },
 };
 </script>
+
+<style lang="scss">
+.daily-schedule.editable > div {
+  cursor: pointer;
+  opacity: 0.7;
+  &:hover {
+    opacity: 1;
+  }
+}
+</style>
