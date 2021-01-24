@@ -3,17 +3,18 @@
     <div
       v-for="(dailySchedule, i) in internalValue"
       :key="i"
-      class="align-center d-flex pa-2">
-      <span class="day-of-week">{{textDays[i]}}</span>
+      class="align-center d-flex pa-1">
+      <span class="day-of-week flex-grow-0 flex-shrink-0">{{textDays[i]}}</span>
       <v-select
         v-model="internalValue[i]"
-        class="select-daily-schedule flex-grow-0 flex-shrink-0"
+        class="select-daily-schedule flex-grow-0 flex-shrink-0 ml-4"
         :items="itemsDailySchedules" />
       <ThermiteDailyScheduleViewer
-        class="flex-grow-1 flex-shrink-1 ml-4"
+        class="flex-grow-1 flex-shrink-1 ml-2"
         :daily-schedule="dailySchedules[dailySchedule]"
         :now="now"
-        :set-points="setPoints" />
+        :set-points="setPoints"
+        :weekday="i" />
     </div>
   </div>
 </template>
@@ -43,6 +44,7 @@ export default {
     value: Number,
   },
   data() {
+    const internalValue = toInternalValue(this.value);
     const now = new Date();
 
     const weekdays = Info.weekdays('short');
@@ -50,22 +52,22 @@ export default {
       weekdays[6],
       ...weekdays.slice(0, -1),
     ];
-    return { now, textDays };
+    return { internalValue, now, textDays };
   },
   computed: {
-    internalValue: {
-      get() {
-        return toInternalValue(this.value);
-      },
-      set(internalValue) {
-        const value = fromInternalValue(internalValue);
-        this.$emit('input', value);
-      },
-    },
     itemsDailySchedules() {
       return this.dailySchedules.map(
         ({ name }, i) => ({ text: name, value: i }),
       );
+    },
+  },
+  watch: {
+    internalValue: {
+      deep: true,
+      handler() {
+        const value = fromInternalValue(this.internalValue);
+        this.$emit('input', value);
+      },
     },
   },
   created() {
@@ -82,7 +84,7 @@ export default {
 <style lang="scss">
 .weekly-schedule {
   & .day-of-week {
-    width: 50px;
+    width: 40px;
   }
   & .select-daily-schedule {
     width: 200px;
