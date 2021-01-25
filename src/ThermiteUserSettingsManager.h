@@ -1,7 +1,6 @@
 #ifndef _THERMITE_USER_SETTINGS_MANAGER_H__
 #define _THERMITE_USER_SETTINGS_MANAGER_H__
 
-#include <Arduino.h>
 #include <ArduinoJson.h>
 
 #include "JsonIO.h"
