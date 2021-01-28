@@ -48,7 +48,8 @@ bool ThermiteSetPoint::validateJSON(const JsonObject& root) const {
 void ThermiteSetPoint::updateFromJSON(const JsonObject& root) {
   if (root.containsKey("name")) {
     const char* name = root["name"].as<const char*>();
-    strcpy(_name, name);
+    strncpy(_name, name, 15);
+    _name[15] = '\0';
   }
   if (root.containsKey("tempTarget")) {
     float tempTarget = root["tempTarget"].as<float>();
@@ -110,7 +111,8 @@ bool ThermiteDailySchedule::validateJSON(const JsonObject& root) const {
 void ThermiteDailySchedule::updateFromJSON(const JsonObject& root) {
   if (root.containsKey("name")) {
     const char* name = root["name"].as<const char*>();
-    strcpy(_name, name);
+    strncpy(_name, name, 15);
+    _name[15] = '\0';
   }
   if (root.containsKey("schedule")) {
     JsonArray schedule = root["schedule"].as<JsonArray>();
