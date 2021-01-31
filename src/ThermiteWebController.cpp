@@ -88,7 +88,8 @@ void ThermiteWebController::initRoutes(AsyncWebServer& server) {
       this,
       std::placeholders::_1,
       std::placeholders::_2
-    )
+    ),
+    3072u
   );
   handlerPutUserSettings->setMethod(HTTP_PUT);
   server.addHandler(handlerPutUserSettings);
