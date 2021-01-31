@@ -1,3 +1,6 @@
+#ifdef UNIT_TEST
+
+#include <Arduino.h>
 #include <unity.h>
 
 #include "ThermiteUserSettingsManager.cpp"
@@ -101,18 +104,6 @@ void testSetPointToJson() {
   TEST_ASSERT_EQUAL_STRING(setPoint._name, root["name"]);
   TEST_ASSERT_EQUAL(setPoint._tempTarget, root["tempTarget"]);
   TEST_ASSERT_TRUE(setPoint.validateJSON(root));
-}
-
-void testSetPoint() {
-  testSetPointEmpty();
-  testSetPointNameValid();
-  testSetPointNameEmpty();
-  testSetPointNameTooLong();
-  testSetPointTempTargetValid();
-  testSetPointTempTargetTooLow();
-  testSetPointTempTargetTooHigh();
-  testSetPointBothValid();
-  testSetPointToJson();
 }
 
 void testDailyScheduleEmpty() {
@@ -337,22 +328,6 @@ void testDailyScheduleToJson() {
   }
 }
 
-void testDailySchedule() {
-  testDailyScheduleEmpty();
-  testDailyScheduleNameValid();
-  testDailyScheduleNameEmpty();
-  testDailyScheduleNameTooLong();
-  testDailyScheduleScheduleValid();
-  testDailyScheduleScheduleEmpty();
-  testDailyScheduleScheduleTooShort();
-  testDailyScheduleScheduleTooLong();
-  testDailyScheduleScheduleNotArray();
-  testDailyScheduleScheduleValueTooLow();
-  testDailyScheduleScheduleValueTooHigh();
-  testDailyScheduleBothValid();
-  testDailyScheduleToJson();
-}
-
 void testUserSettingsManagerEmpty() {
   ThermiteUserSettingsManager userSettingsManager;
 
@@ -378,6 +353,15 @@ void testUserSettingsManagerSetPointsValid() {
     setPoints[i].toJSON(jsonSetPoint);
   }
   TEST_ASSERT_TRUE(userSettingsManager.validateJSON(root));
+
+  userSettingsManager.updateFromJSON(root);
+  for (int i = 0; i < 4; i++) {
+    TEST_ASSERT_EQUAL_STRING(userSettingsManager._setPoints[i]._name, setPoints[i]._name);
+    TEST_ASSERT_EQUAL(
+      userSettingsManager._setPoints[i]._tempTarget,
+      setPoints[i]._tempTarget
+    );
+  }
 }
 
 void testUserSettingsManagerSetPointsEmpty() {
@@ -453,6 +437,17 @@ void testUserSettingsManagerDailySchedulesValid() {
     dailySchedule.toJSON(jsonDailySchedule);
   }
   TEST_ASSERT_TRUE(userSettingsManager.validateJSON(root));
+
+  userSettingsManager.updateFromJSON(root);
+  for (int i = 0; i < 4; i++) {
+    TEST_ASSERT_EQUAL_STRING(userSettingsManager._dailySchedules[i]._name, "foo");
+    for (int j = 0; j < 12; j++) {
+      TEST_ASSERT_EQUAL(
+        userSettingsManager._dailySchedules[i]._schedule[j],
+        schedule[j]
+      );
+    }
+  }
 }
 
 void testUserSettingsManagerDailySchedulesEmpty() {
@@ -512,86 +507,212 @@ void testUserSettingsManagerDailySchedulesNotArray() {
 }
 
 void testUserSettingsManagerWeeklyScheduleValid() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["weeklySchedule"] = 0x2a02;
+  TEST_ASSERT_TRUE(userSettingsManager.validateJSON(root));
+
+  userSettingsManager.updateFromJSON(root);
+  TEST_ASSERT_EQUAL(userSettingsManager._weeklySchedule, 0x2a02);
 }
 
 void testUserSettingsManagerWeeklyScheduleOverflow() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["weeklySchedule"] = 0x10000;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerWeeklyScheduleTopBitsSet() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["weeklySchedule"] = 0x4000;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerWeeklyScheduleTooLow() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["weeklySchedule"] = -1;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerTempOverrideValid() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["tempOverride"] = 17.5f;
+  TEST_ASSERT_TRUE(userSettingsManager.validateJSON(root));
+
+  userSettingsManager.updateFromJSON(root);
+  TEST_ASSERT_EQUAL(userSettingsManager._tempOverride, 17.5f);
 }
 
 void testUserSettingsManagerTempOverrideTooLow() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["tempOverride"] = -100.0f;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerTempOverrideTooHigh() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["tempOverride"] = 100.0f;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerOverrideValid() {
+  ThermiteUserSettingsManager userSettingsManager;
 
-}
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["overrideStart"] = 1612242000ul;
+  root["overrideEnd"] = 1612846800ul;
+  TEST_ASSERT_TRUE(userSettingsManager.validateJSON(root));
 
-void testUserSettingsManagerOverrideValidMoreThan32Bits() {
-
+  userSettingsManager.updateFromJSON(root);
+  TEST_ASSERT_EQUAL(userSettingsManager._overrideStart, 1612242000ul);
+  TEST_ASSERT_EQUAL(userSettingsManager._overrideEnd, 1612846800ul);
 }
 
 void testUserSettingsManagerOverrideStartZeroEndNonZero() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["overrideStart"] = 0ul;
+  root["overrideEnd"] = 1612846800ul;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerOverrideStartNonZeroEndZero() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["overrideStart"] = 1612242000ul;
+  root["overrideEnd"] = 0ul;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
 void testUserSettingsManagerOverrideStartAfterEnd() {
+  ThermiteUserSettingsManager userSettingsManager;
 
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["overrideStart"] = 1612846800ul;
+  root["overrideEnd"] = 1612242000ul;
+  TEST_ASSERT_FALSE(userSettingsManager.validateJSON(root));
 }
 
-
-void testUserSettingsManager() {
-  testUserSettingsManagerEmpty();
-  testUserSettingsManagerSetPointsValid();
-  testUserSettingsManagerSetPointsEmpty();
-  testUserSettingsManagerSetPointsTooShort();
-  testUserSettingsManagerSetPointsTooLong();
-  testUserSettingsManagerSetPointsNotArray();
-  testUserSettingsManagerDailySchedulesValid();
-  testUserSettingsManagerDailySchedulesEmpty();
-  testUserSettingsManagerDailySchedulesTooShort();
-  testUserSettingsManagerDailySchedulesTooLong();
-  testUserSettingsManagerDailySchedulesNotArray();
-  testUserSettingsManagerWeeklyScheduleValid();
-  testUserSettingsManagerWeeklyScheduleOverflow();
-  testUserSettingsManagerWeeklyScheduleTopBitsSet();
-  testUserSettingsManagerWeeklyScheduleTooLow();
-  testUserSettingsManagerTempOverrideValid();
-  testUserSettingsManagerTempOverrideTooLow();
-  testUserSettingsManagerTempOverrideTooHigh();
-  testUserSettingsManagerOverrideValid();
-  testUserSettingsManagerOverrideValidMoreThan32Bits();
-  testUserSettingsManagerOverrideStartZeroEndNonZero();
-  testUserSettingsManagerOverrideStartNonZeroEndZero();
-  testUserSettingsManagerOverrideStartAfterEnd();
+void testUserSettingsManagerToJson() {
+  ThermiteUserSettingsManager userSettingsManager;
+  
+  StaticJsonDocument<CAPACITY_USER_SETTINGS_MANAGER> doc;
+  JsonObject root = doc.to<JsonObject>();
+  TEST_ASSERT_TRUE(userSettingsManager.toJSON(root));
+  for (int i = 0; i < 4; i++) {
+    const JsonObject& jsonSetPoint = root["setPoints"][i];
+    TEST_ASSERT_EQUAL_STRING(
+      userSettingsManager._setPoints[i]._name,
+      jsonSetPoint["name"]
+    );
+    TEST_ASSERT_EQUAL(
+      userSettingsManager._setPoints[i]._tempTarget,
+      jsonSetPoint["tempTarget"]
+    );
+  }
+  for (int i = 0; i < 4; i++) {
+    const JsonObject& jsonDailySchedule = root["dailySchedules"][i];
+    TEST_ASSERT_EQUAL_STRING(
+      userSettingsManager._dailySchedules[i]._name,
+      jsonDailySchedule["name"]
+    );
+    for (int j = 0; j < 12; j++) {
+      TEST_ASSERT_EQUAL(
+        userSettingsManager._dailySchedules[i]._schedule[j],
+        jsonDailySchedule["schedule"][j]
+      );
+    }
+  }
+  TEST_ASSERT_EQUAL(userSettingsManager._weeklySchedule, root["weeklySchedule"]);
+  TEST_ASSERT_EQUAL(userSettingsManager._tempOverride, root["tempOverride"]);
+  TEST_ASSERT_EQUAL(userSettingsManager._overrideStart, root["overrideStart"]);
+  TEST_ASSERT_EQUAL(userSettingsManager._overrideEnd, root["overrideEnd"]);
 }
 
 void setup() {
+  // NOTE!!! Wait for >2 secs
+  // if board doesn't support software reset via Serial.DTR/RTS
+  delay(2000);
+
   UNITY_BEGIN();
-  RUN_TEST(testSetPoint);
-  RUN_TEST(testDailySchedule);
-  RUN_TEST(testUserSettingsManager);
+
+  RUN_TEST(testSetPointEmpty);
+  RUN_TEST(testSetPointNameValid);
+  RUN_TEST(testSetPointNameEmpty);
+  RUN_TEST(testSetPointNameTooLong);
+  RUN_TEST(testSetPointTempTargetValid);
+  RUN_TEST(testSetPointTempTargetTooLow);
+  RUN_TEST(testSetPointTempTargetTooHigh);
+  RUN_TEST(testSetPointBothValid);
+  RUN_TEST(testSetPointToJson);
+
+  RUN_TEST(testDailyScheduleEmpty);
+  RUN_TEST(testDailyScheduleNameValid);
+  RUN_TEST(testDailyScheduleNameEmpty);
+  RUN_TEST(testDailyScheduleNameTooLong);
+  RUN_TEST(testDailyScheduleScheduleValid);
+  RUN_TEST(testDailyScheduleScheduleEmpty);
+  RUN_TEST(testDailyScheduleScheduleTooShort);
+  RUN_TEST(testDailyScheduleScheduleTooLong);
+  RUN_TEST(testDailyScheduleScheduleNotArray);
+  RUN_TEST(testDailyScheduleScheduleValueTooLow);
+  RUN_TEST(testDailyScheduleScheduleValueTooHigh);
+  RUN_TEST(testDailyScheduleBothValid);
+  RUN_TEST(testDailyScheduleToJson);
+
+  RUN_TEST(testUserSettingsManagerEmpty);
+  RUN_TEST(testUserSettingsManagerSetPointsValid);
+  RUN_TEST(testUserSettingsManagerSetPointsEmpty);
+  RUN_TEST(testUserSettingsManagerSetPointsTooShort);
+  RUN_TEST(testUserSettingsManagerSetPointsTooLong);
+  RUN_TEST(testUserSettingsManagerSetPointsNotArray);
+  RUN_TEST(testUserSettingsManagerDailySchedulesValid);
+  RUN_TEST(testUserSettingsManagerDailySchedulesEmpty);
+  RUN_TEST(testUserSettingsManagerDailySchedulesTooShort);
+  RUN_TEST(testUserSettingsManagerDailySchedulesTooLong);
+  RUN_TEST(testUserSettingsManagerDailySchedulesNotArray);
+  RUN_TEST(testUserSettingsManagerWeeklyScheduleValid);
+  RUN_TEST(testUserSettingsManagerWeeklyScheduleOverflow);
+  RUN_TEST(testUserSettingsManagerWeeklyScheduleTopBitsSet);
+  RUN_TEST(testUserSettingsManagerWeeklyScheduleTooLow);
+  RUN_TEST(testUserSettingsManagerTempOverrideValid);
+  RUN_TEST(testUserSettingsManagerTempOverrideTooLow);
+  RUN_TEST(testUserSettingsManagerTempOverrideTooHigh);
+  RUN_TEST(testUserSettingsManagerOverrideValid);
+  RUN_TEST(testUserSettingsManagerOverrideStartZeroEndNonZero);
+  RUN_TEST(testUserSettingsManagerOverrideStartNonZeroEndZero);
+  RUN_TEST(testUserSettingsManagerOverrideStartAfterEnd);
+  RUN_TEST(testUserSettingsManagerToJson);
+
   UNITY_END();
 }
 
 void loop() {}
+
+#endif
