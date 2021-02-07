@@ -3,14 +3,8 @@
 #include <Arduino.h>
 #include <unity.h>
 
+#include "Constants.h"
 #include "ThermiteUserSettingsManager.cpp"
-
-const size_t CAPACITY_SET_POINT =
-  JSON_OBJECT_SIZE(2) + JSON_STRING_SIZE(16);
-const size_t CAPACITY_DAILY_SCHEDULE =
-  JSON_OBJECT_SIZE(2) + JSON_ARRAY_SIZE(12) + JSON_STRING_SIZE(16);
-const size_t CAPACITY_USER_SETTINGS_MANAGER =
-  JSON_OBJECT_SIZE(6) + CAPACITY_SET_POINT * 4 + CAPACITY_DAILY_SCHEDULE * 4;
 
 void testSetPointEmpty() {
   ThermiteSetPoint setPoint("foo", 16.0f);

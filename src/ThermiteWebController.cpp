@@ -1,11 +1,14 @@
 #include <AsyncJson.h>
 #include <functional>
 
+#include "Constants.h"
 #include "ThermiteWebController.h"
 
 HttpError::HttpError(uint16_t code, const char* message)
-: _code(code),
-  _message(message) {}
+: _code(code) {
+  strncpy(_message, message, 31);
+  _message[31] = '\0';
+}
 
 bool HttpError::toJSON(const JsonObject& root) const {
   if (!root["code"].set(_code)) {
@@ -23,8 +26,8 @@ ThermiteWebController::ThermiteWebController(
 ) : _userSettingsManager(userSettingsManager),
     _internalState(internalState) {}
 
-void ThermiteWebController::_send(AsyncWebServerRequest* request, const JsonWrite& jsonWrite) const {
-  AsyncJsonResponse* response = new AsyncJsonResponse(false, 3072u);
+void ThermiteWebController::_send(AsyncWebServerRequest* request, const JsonWrite& jsonWrite, size_t maxSize) const {
+  AsyncJsonResponse* response = new AsyncJsonResponse(false, maxSize);
   const JsonObject& root = response->getRoot();
   jsonWrite.toJSON(root);
   response->setLength();
@@ -32,7 +35,7 @@ void ThermiteWebController::_send(AsyncWebServerRequest* request, const JsonWrit
 }
 
 void ThermiteWebController::_sendError(AsyncWebServerRequest* request, const HttpError& httpError) const {
-  AsyncJsonResponse* response = new AsyncJsonResponse();
+  AsyncJsonResponse* response = new AsyncJsonResponse(false, CAPACITY_HTTP_ERROR);
   response->setCode(httpError._code);
   const JsonObject& root = response->getRoot();
   httpError.toJSON(root);
@@ -42,11 +45,11 @@ void ThermiteWebController::_sendError(AsyncWebServerRequest* request, const Htt
 
 void ThermiteWebController::getInternalState(AsyncWebServerRequest* request) {
   _internalState.updateDateTimeIso();
-  _send(request, _internalState);
+  _send(request, _internalState, CAPACITY_INTERNAL_STATE);
 }
 
 void ThermiteWebController::getUserSettings(AsyncWebServerRequest* request) {
-  _send(request, _userSettingsManager);
+  _send(request, _userSettingsManager, CAPACITY_USER_SETTINGS_MANAGER);
 }
 
 void ThermiteWebController::putUserSettings(AsyncWebServerRequest* request, const JsonVariant& json) {
@@ -55,7 +58,7 @@ void ThermiteWebController::putUserSettings(AsyncWebServerRequest* request, cons
     HttpError error = { HTTP_BAD_REQUEST, "Invalid user settings" };
     _sendError(request, error);
   } else {
-    _send(request, _userSettingsManager);
+    _send(request, _userSettingsManager, CAPACITY_USER_SETTINGS_MANAGER);
   }
 }
 
@@ -89,7 +92,7 @@ void ThermiteWebController::initRoutes(AsyncWebServer& server) {
       std::placeholders::_1,
       std::placeholders::_2
     ),
-    3072u
+    CAPACITY_USER_SETTINGS_MANAGER
   );
   handlerPutUserSettings->setMethod(HTTP_PUT);
   server.addHandler(handlerPutUserSettings);

@@ -4,8 +4,10 @@
 #include <ESPAsyncWebServer.h>
 #include <NTPClient.h>
 #include <OneWire.h>
+#include <SparkFun_Qwiic_Relay.h>
 #include <Timezone.h>
 #include <WiFiUdp.h>
+#include <Wire.h>
 
 #include "private.h"
 #include "ThermiteInternalState.h"
@@ -13,8 +15,8 @@
 #include "ThermiteWebController.h"
 
 #define PIN_ONE_WIRE 0
-#define PIN_WIFI_INDICATOR 4
-#define PIN_HEATER 5
+#define PIN_LED_INDICATOR 4
+#define RELAY_ADDR_HEATER 0x18
 
 #define LOOP_INTERVAL 100ul
 
@@ -31,6 +33,12 @@
  */
 OneWire oneWire(PIN_ONE_WIRE);
 DallasTemperature thermometerManager(&oneWire);
+
+/**
+ * Qwiic relay to control the heater.
+ */
+Qwiic_Relay heaterManager(RELAY_ADDR_HEATER);
+
 
 /**
  * NTP client, used so that we can schedule temperature changes according to real-world
@@ -79,29 +87,49 @@ ThermiteInternalState internalState(
 );
 ThermiteWebController webController(userSettingsManager, internalState);
 
+/**
+ * Indicates whether thermite is connected to an actual heater.  We set this flag below
+ * in `setup()`, and use it in `loop()` to avoid doing work if initialization didn't succeed.
+ */
+bool heaterConnected = false;
+
 // HARDWARE
 
 bool initHardware() {
-  pinMode(PIN_WIFI_INDICATOR, OUTPUT);
-  pinMode(PIN_HEATER, OUTPUT);
-
-  digitalWrite(PIN_WIFI_INDICATOR, LOW);
-  digitalWrite(PIN_HEATER, LOW);
-
+  Wire.begin();
   Serial.begin(115200);
   Serial.println();
 
-  bool result = internalState.init();
-  if (!result) {
+  pinMode(PIN_LED_INDICATOR, OUTPUT);
+  digitalWrite(PIN_LED_INDICATOR, LOW);
+
+  if (!internalState.init()) {
     Serial.println("Could not initialize thermometer!");
+    return false;
   }
-  return result;
+
+  heaterConnected = heaterManager.begin();
+  if (heaterConnected) {
+    Serial.println("Could not initialize heater relay!");
+  }
+
+  return true;
 }
 
 void updateHardware() {
   bool heater = internalState.getHeater();
-  digitalWrite(PIN_HEATER, heater ? HIGH : LOW);
-};
+  if (heater) {
+    if (heaterConnected) {
+      heaterManager.turnRelayOn();
+    }
+    digitalWrite(PIN_LED_INDICATOR, HIGH);
+  } else {
+    if (heaterConnected) {
+      heaterManager.turnRelayOff();
+    }
+    digitalWrite(PIN_LED_INDICATOR, LOW);
+  }
+}
 
 // WIFI
 
@@ -122,7 +150,7 @@ uint8_t initWifiConnection() {
 
     // blink LED, print to serial
     wifiIndicator = i % 2 == 0 ? HIGH : LOW;
-    digitalWrite(PIN_WIFI_INDICATOR, wifiIndicator);
+    digitalWrite(PIN_LED_INDICATOR, wifiIndicator);
     delay(100);
     if (i % 5 == 0) {
       Serial.print(".");
@@ -133,7 +161,7 @@ uint8_t initWifiConnection() {
 
 void notifyWifiStatus(uint8_t status) {
   if (status == WL_NO_SSID_AVAIL) {
-    Serial.print("Invalid wifi SSID!");
+    Serial.println("Invalid wifi SSID!");
   } else if (status == WL_CONNECTED) {
     Serial.print("Connected to wifi, IP address: ");
     Serial.println(WiFi.localIP());
@@ -142,7 +170,7 @@ void notifyWifiStatus(uint8_t status) {
   }
 
   wifiIndicator = status == WL_CONNECTED ? LOW : HIGH;
-  digitalWrite(PIN_WIFI_INDICATOR, wifiIndicator);
+  digitalWrite(PIN_LED_INDICATOR, wifiIndicator);
 
   Serial.println();
 }
@@ -153,14 +181,14 @@ uint8_t initWifi() {
   return status;
 }
 
-// MAIN FUNCTIONS
+bool initAll() {
+  delay(2000);
 
-void setup() {
   if (!initHardware()) {
-    return;
+    return false;
   }
   if (initWifi() != WL_CONNECTED) {
-    return;
+    return false;
   }
   ntpClient.begin();
   webController.initRoutes(server);
@@ -170,6 +198,14 @@ void setup() {
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Max-Age", "600");
   server.begin();
+
+  return true;
+}
+
+// MAIN FUNCTIONS
+
+void setup() {
+  initAll();
 }
 
 unsigned long getLoopDelay(unsigned long startOfLoop, unsigned long endOfLoop) {

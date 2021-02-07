@@ -6,10 +6,10 @@
 #include <NTPClient.h>
 #include <Timezone.h>
 
+#include "Constants.h"
 #include "JsonIO.h"
 #include "ThermiteUserSettingsManager.h"
 
-#define DATE_TIME_ISO_LEN 26
 #define TEMP_RESOLUTION 11
 #define TEMP_REQUEST_DELAY 750ul / (1ul << (12 - TEMP_RESOLUTION))
 #define TEMP_REQUEST_INTERVAL 60000ul

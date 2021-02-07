@@ -20,7 +20,7 @@
  */
 struct HttpError : public JsonWrite {
   uint16_t _code;
-  const char* _message;
+  char _message[32];
 
   HttpError(uint16_t code, const char* message);
   uint16_t getCode() const;
@@ -32,7 +32,7 @@ private:
   ThermiteUserSettingsManager& _userSettingsManager;
   ThermiteInternalState& _internalState;
 
-  void _send(AsyncWebServerRequest* request, const JsonWrite& jsonWrite) const;
+  void _send(AsyncWebServerRequest* request, const JsonWrite& jsonWrite, size_t maxSize) const;
   void _sendError(AsyncWebServerRequest* request, const HttpError& error) const;
 public:
   ThermiteWebController(
